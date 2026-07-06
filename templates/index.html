@@ -1,8 +1,90 @@
 <!DOCTYPE html>
-<html>
-<head><title>Inventory Management System</title></head>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Inventory Management System</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; color: #222; }
+  h1 { margin-bottom: 4px; }
+  .muted { color: #666; margin-top: 0; }
+  button { background: #2d6cdf; color: #fff; border: none; padding: 10px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; }
+  button:hover { background: #1e54b7; }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+  th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; font-size: 14px; }
+  th { background: #f4f4f4; }
+  #status { margin-top: 10px; font-size: 14px; }
+  form { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+</style>
+</head>
 <body>
   <h1>Inventory Management System</h1>
-  <p>UI coming in feature/frontend-ui</p>
+  <p class="muted">Flask REST API + Fake Store external API demo</p>
+
+  <button id="importBtn">Import products from external API</button>
+  <div id="status"></div>
+
+  <h3>Add product manually</h3>
+  <form id="addForm">
+    <input name="name" placeholder="Name" required>
+    <input name="price" placeholder="Price" type="number" step="0.01">
+    <input name="quantity" placeholder="Quantity" type="number">
+    <input name="category" placeholder="Category">
+    <button type="submit">Add product</button>
+  </form>
+
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Qty</th><th></th></tr>
+    </thead>
+    <tbody id="productRows"></tbody>
+  </table>
+
+<script>
+async function loadProducts() {
+  const res = await fetch("/products");
+  const products = await res.json();
+  const rows = products.map(p => `
+    <tr>
+      <td>${p.id}</td><td>${p.name}</td><td>${p.category || ""}</td>
+      <td>$${Number(p.price).toFixed(2)}</td><td>${p.quantity}</td>
+      <td><button onclick="deleteProduct(${p.id})">Delete</button></td>
+    </tr>`).join("");
+  document.getElementById("productRows").innerHTML = rows;
+}
+
+async function deleteProduct(id) {
+  await fetch(`/products/${id}`, { method: "DELETE" });
+  loadProducts();
+}
+
+document.getElementById("importBtn").addEventListener("click", async () => {
+  const statusEl = document.getElementById("status");
+  statusEl.textContent = "Importing...";
+  const res = await fetch("/external-products/import", { method: "POST" });
+  const data = await res.json();
+  statusEl.textContent = res.ok
+    ? `Imported ${data.imported_count} new product(s).`
+    : `Error: ${data.error}`;
+  loadProducts();
+});
+
+document.getElementById("addForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = new FormData(e.target);
+  const body = Object.fromEntries(form.entries());
+  body.price = parseFloat(body.price) || 0;
+  body.quantity = parseInt(body.quantity) || 0;
+  await fetch("/products", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  e.target.reset();
+  loadProducts();
+});
+
+loadProducts();
+</script>
 </body>
 </html>
